@@ -16,8 +16,15 @@
 #define TAG 0
 #define THRESHOLD 4
 
+typedef struct CheckedSequences
+{
+    char sequence[SEQUENCE_2_LIMIT];
+    int n;
+    int k;
+} CheckedSequence;
+
 void readVarsFromFile(float *w1, float *w2, float *w3, float *w4, char *mainSequence, int *numOfSequences, FILE *reader);
-void checkSequence(char *mainSequence, char *checkedSequence, FILE *writer, float w1, float w2, float w3, float w4);
+void checkSequence(char *mainSequence, char *checkedSequence /*, FILE *writer*/, float w1, float w2, float w3, float w4, int *n, int *k);
 void getclosestOffsetAndHyphen(char *mainSequence, char *checkedSequence, int *n, int *k, float w1, float w2, float w3, float w4);
 float getAlignmentForClosestHypenAndCurrentOffset(char *mainSequence, char *checkedSequence, int offset, int *k, float w1, float w2, float w3, float w4);
 void generateSignsForCurrentOffsetAndCurrentHyphenIndex(char *mainSequence, char *checkedSequence, int offset, int hyphenIndex, char *currentSigns);
@@ -27,9 +34,12 @@ int areSemiConservative(char mainChar, char checkedChar);
 int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize);
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4);
 
-void decideWhichOnesToSendToTheSlave(char mySequences[][SEQUENCE_2_LIMIT], int numOfSequences);
+void handleMultipleRoundsOfSequences(CheckedSequence mySequences[], int numOfSequencesToSend, int *sequencesToIgnore);
+void handleOneRoundOfSequences(CheckedSequence mySequences[], int numOfSequences, int numOfSequencesToSend, int *sequencesToIgnore);
+void sendTheSlaveItsPartOfTheSequences(char *mainSequence, CheckedSequence mySequences[], int numOfSequences, int *sequencesToIgnore, int rank, float w1, float w2, float w3, float w4);
 int getLongestSequenceIndex(int array[], int numOfElements);
-void getTheSequence();
+void slaveJob(int rank);
+void mpiSendReceiveInitialVariables(int *mainSequenceLength, int *numOfSequancesToSendReceive, char *mainSequence, float *w1, float *w2, float *w3, float *w4, int rank);
 
 int main(int argc, char *argv[])
 {
@@ -44,22 +54,25 @@ int main(int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    mainSequence = (char *)malloc(SEQUENCE_1_LIMIT * sizeof(char));
-    // checkedSequence = (char *)malloc(SEQUENCE_2_LIMIT * sizeof(char));
-
     if (rank == MASTER_ID)
     {
+        mainSequence = (char *)malloc(SEQUENCE_1_LIMIT * sizeof(char));
         reader = fopen(INPUT_FILE, MODE_READ);
         writer = fopen(OUTPUT_FILE, MODE_WRITE);
         readVarsFromFile(&w1, &w2, &w3, &w4, mainSequence, &numOfSequences, reader);
-        char mySequences[numOfSequences][SEQUENCE_2_LIMIT];
+        CheckedSequence mySequences[numOfSequences];
+
         for (int i = 0; i < numOfSequences; i++)
-            fscanf(reader, "%s", mySequences[i]);
-        decideWhichOnesToSendToTheSlave(mySequences, numOfSequences);
+            fscanf(reader, "%s", mySequences[i].sequence);
+
+        // sequencesToIgnore are the ones that the MASTER sends to the SLAVE
+        int *sequencesToIgnore = (int *)malloc(numOfSequences / THRESHOLD * sizeof(int));
+        sendTheSlaveItsPartOfTheSequences(mainSequence, mySequences, numOfSequences, sequencesToIgnore, rank, w1, w2, w3, w4);
+        // checkTheSequences(mySequences, numOfSequences, sequencesToIgnore);
     }
     else
     {
-        getTheSequence();
+        slaveJob(rank);
     }
 
     // for (int i = 0; i < numOfSequences; i++)
@@ -76,48 +89,61 @@ int main(int argc, char *argv[])
     {
         fclose(writer);
         fclose(reader);
+        free(mainSequence);
     }
 
     // free(checkedSequence);
-    free(mainSequence);
+    
 
     MPI_Finalize();
     return 0;
 }
 
-void decideWhichOnesToSendToTheSlave(char mySequences[][SEQUENCE_2_LIMIT], int numOfSequences)
+// void checkTheSequences()
+// {
+// }
+
+void sendTheSlaveItsPartOfTheSequences(char *mainSequence, CheckedSequence mySequences[], int numOfSequences, int *sequencesToIgnore, int rank, float w1, float w2, float w3, float w4)
 {
+    int mainSequenceLength = strlen(mainSequence);
     int numOfSequencesToSend = numOfSequences / THRESHOLD;
+    mpiSendReceiveInitialVariables(&mainSequenceLength, &numOfSequencesToSend, mainSequence, &w1, &w2, &w3, &w4, rank);
+
     if (numOfSequencesToSend > 1)
-    {
-        char arrayOfSequencesToSend[numOfSequencesToSend][SEQUENCE_2_LIMIT];
-        int index = 0;
-        for (int j = 0; j < numOfSequencesToSend; j++)
-        {
-            int array[THRESHOLD];
-            for (int i = 0; i < THRESHOLD; i++)
-                array[i] = strlen(mySequences[index++]);
-            int longestSequenceIndex = getLongestSequenceIndex(array, THRESHOLD);
-            memcpy(arrayOfSequencesToSend[j], mySequences[longestSequenceIndex], strlen(mySequences[longestSequenceIndex]) + 1);
-        }
-        MPI_Send(&numOfSequencesToSend, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD);
-        for (int i = 0; i < numOfSequencesToSend; i++)
-        {
-            int length = strlen(arrayOfSequencesToSend[i]);
-            MPI_Send(&length, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD);
-            MPI_Send(arrayOfSequencesToSend[i],length, MPI_CHAR, SLAVE_ID, TAG, MPI_COMM_WORLD);
-        }
-    }
+        handleMultipleRoundsOfSequences(mySequences, numOfSequencesToSend, sequencesToIgnore);
     else
+        handleOneRoundOfSequences(mySequences, numOfSequences, numOfSequencesToSend, sequencesToIgnore);
+}
+
+void handleOneRoundOfSequences(CheckedSequence mySequences[], int numOfSequences, int numOfSequencesToSend, int *sequencesToIgnore)
+{
+    int array[numOfSequences];
+    for (int i = 0; i < numOfSequences; i++)
+        array[i] = strlen(mySequences[i].sequence);
+    int longestSeqIndex = sequencesToIgnore[0] = getLongestSequenceIndex(array, numOfSequences);
+    int lengthOfEachSequence = strlen(mySequences[longestSeqIndex].sequence);
+    MPI_Send(&lengthOfEachSequence, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD);
+    MPI_Send(mySequences[longestSeqIndex].sequence, lengthOfEachSequence, MPI_CHAR, SLAVE_ID, TAG, MPI_COMM_WORLD);
+}
+
+void handleMultipleRoundsOfSequences(CheckedSequence mySequences[], int numOfSequencesToSend, int *sequencesToIgnore)
+{
+    char arrayOfSequencesToSend[numOfSequencesToSend][SEQUENCE_2_LIMIT];
+    int index = 0;
+
+    for (int j = 0; j < numOfSequencesToSend; j++)
     {
-        int array[numOfSequences];
-        for (int i = 0; i < numOfSequences; i++)
-            array[i] = strlen(mySequences[i]);
-        int longestSeqIndex = getLongestSequenceIndex(array, numOfSequences);
-        MPI_Send(&numOfSequencesToSend, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD);
-        int length = strlen(mySequences[longestSeqIndex]);
-        MPI_Send(&length, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD);
-        MPI_Send(mySequences[longestSeqIndex], length, MPI_CHAR, SLAVE_ID, TAG, MPI_COMM_WORLD);
+        int array[THRESHOLD];
+        for (int i = 0; i < THRESHOLD; i++)
+            array[i] = strlen(mySequences[index++].sequence);
+        int longestSequenceIndex = sequencesToIgnore[j] = getLongestSequenceIndex(array, THRESHOLD) + j * THRESHOLD;
+        memcpy(arrayOfSequencesToSend[j], mySequences[longestSequenceIndex].sequence, strlen(mySequences[longestSequenceIndex].sequence) + 1);
+    }
+    for (int i = 0; i < numOfSequencesToSend; i++)
+    {
+        int lengthOfEachSequence = strlen(arrayOfSequencesToSend[i]);
+        MPI_Send(&lengthOfEachSequence, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD);
+        MPI_Send(arrayOfSequencesToSend[i], lengthOfEachSequence, MPI_CHAR, SLAVE_ID, TAG, MPI_COMM_WORLD);
     }
 }
 
@@ -134,23 +160,57 @@ int getLongestSequenceIndex(int array[], int numOfElements)
     return maxIndex;
 }
 
-void getTheSequence()
+void slaveJob(int rank)
 {
     MPI_Status status;
-    int numOfSequancesToAllocate;
-    MPI_Recv(&numOfSequancesToAllocate, 1, MPI_INT, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
-    char sequencesToCheck[numOfSequancesToAllocate][SEQUENCE_2_LIMIT];
+    int mainSequenceLength, numOfSequancesToAllocate;
+    char *mainSequence = (char *)malloc(SEQUENCE_1_LIMIT * sizeof(char));
+    float w1, w2, w3, w4;
+    mpiSendReceiveInitialVariables(&mainSequenceLength, &numOfSequancesToAllocate, mainSequence, &w1, &w2, &w3, &w4, rank);
+
+    // char sequencesToCheck[numOfSequancesToAllocate][SEQUENCE_2_LIMIT];
+    CheckedSequence sequencesToCheck[numOfSequancesToAllocate];
     for (int i = 0; i < numOfSequancesToAllocate; i++)
     {
-        int length;
-        printf("checker\n");
-        MPI_Recv(&length, 1, MPI_INT, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
-        printf("length from slave is: %d\n", length);
-        MPI_Recv(sequencesToCheck[i], length, MPI_CHAR, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
-        printf("sequencesToCheck from slave is: %s\n", sequencesToCheck[i]);
+        int lengthOfEachSequence;
+        MPI_Recv(&lengthOfEachSequence, 1, MPI_INT, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(sequencesToCheck[i].sequence, lengthOfEachSequence, MPI_CHAR, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
     }
-    printf("\n\nAs The Slave, I received %s \n\n", sequencesToCheck[0]);
-    printf("\n\nAs The Slave, I received %s \n\n", sequencesToCheck[1]);
+    // for (int i = 0; i < numOfSequancesToAllocate; i++)
+    // {
+    //     checkSequence(mainSequence, sequencesToCheck[i].sequence, w1, w2, w3, w4, &sequencesToCheck->n, &sequencesToCheck->k);
+    // }
+
+    printf("\n\nAs The Slave, I received %s \n\n", sequencesToCheck[0].sequence);
+}
+
+void mpiSendReceiveInitialVariables(int *mainSequenceLength, int *numOfSequancesToSendReceive, char *mainSequence, float *w1, float *w2, float *w3, float *w4, int rank)
+{
+    MPI_Status status;
+    if (rank == MASTER_ID)
+    {
+        MPI_Send(mainSequenceLength, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD);
+        MPI_Send(mainSequence, *mainSequenceLength, MPI_CHAR, SLAVE_ID, TAG, MPI_COMM_WORLD);
+
+        MPI_Send(w1, 1, MPI_FLOAT, SLAVE_ID, TAG, MPI_COMM_WORLD);
+        MPI_Send(w2, 1, MPI_FLOAT, SLAVE_ID, TAG, MPI_COMM_WORLD);
+        MPI_Send(w3, 1, MPI_FLOAT, SLAVE_ID, TAG, MPI_COMM_WORLD);
+        MPI_Send(w4, 1, MPI_FLOAT, SLAVE_ID, TAG, MPI_COMM_WORLD);
+
+        MPI_Send(numOfSequancesToSendReceive, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD);
+    }
+    else // SLAVE_ID
+    {
+        MPI_Recv(mainSequenceLength, 1, MPI_INT, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(mainSequence, *mainSequenceLength, MPI_CHAR, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
+
+        MPI_Recv(w1, 1, MPI_FLOAT, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(w2, 1, MPI_FLOAT, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(w3, 1, MPI_FLOAT, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(w4, 1, MPI_FLOAT, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
+
+        MPI_Recv(numOfSequancesToSendReceive, 1, MPI_INT, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
+    }
 }
 
 void readVarsFromFile(float *w1, float *w2, float *w3, float *w4, char *mainSequence, int *numOfSequences, FILE *reader)
@@ -163,15 +223,15 @@ void readVarsFromFile(float *w1, float *w2, float *w3, float *w4, char *mainSequ
     fscanf(reader, "%d", numOfSequences);
 }
 
-void checkSequence(char *mainSequence, char *checkedSequence, FILE *writer, float w1, float w2, float w3, float w4)
+void checkSequence(char *mainSequence, char *checkedSequence /*, FILE *writer*/, float w1, float w2, float w3, float w4, int *n, int *k)
 {
-    int *k = (int *)malloc(sizeof(int));
-    int *n = (int *)malloc(sizeof(int));
+    // int *k = (int *)malloc(sizeof(int));
+    // int *n = (int *)malloc(sizeof(int));
     getclosestOffsetAndHyphen(mainSequence, checkedSequence, n, k, w1, w2, w3, w4);
     printf("The %s\nSequence is done and it closest offset is %d and its closest hyphen is %d\n", checkedSequence, *n, *k);
-    fprintf(writer, "%s", checkedSequence);
-    fprintf(writer, " %d ", *n);
-    fprintf(writer, " %d\n\n", *k);
+    // fprintf(writer, "%s", checkedSequence);
+    // fprintf(writer, " %d ", *n);
+    // fprintf(writer, " %d\n\n", *k);
 }
 
 void getclosestOffsetAndHyphen(char *mainSequence, char *checkedSequence, int *n, int *k, float w1, float w2, float w3, float w4)
