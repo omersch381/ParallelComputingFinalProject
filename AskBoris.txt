@@ -1,0 +1,4 @@
+Can we define the Semi-conservative and conservative as array of string? e.g. char conservative[9][4] = {...}
+
+And also I saw that there are 15 semi-conservative groups in the description but I can count only 11.
+Is it ok to declare the semi-conservative array as char array[11][6] ? are the arrays final?
