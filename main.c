@@ -32,9 +32,9 @@ char checkAndSetProximity(char mainChar, char checkedChar);
 int areConservative(char mainChar, char checkedChar);
 int areSemiConservative(char mainChar, char checkedChar);
 int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize);
-int areTheCharsInGroupGPU(char mainChar, char checkedChar,
-                          const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
-                          int arraySize);
+// int areTheCharsInGroupGPU(char mainChar, char checkedChar,
+//                           const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
+//                           int arraySize);
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4);
 
 void handleMultipleRoundsOfSequences(CheckedSequence mySequences[], int numOfSequencesToSend, int *sequencesToIgnore);
@@ -373,14 +373,14 @@ char checkAndSetProximity(char mainChar, char checkedChar)
 int areConservative(char mainChar, char checkedChar)
 {
     const char conservativeGroup[9][GROUP_STRING_SIZE_LIMIT] = {"NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF"};
-    return areTheCharsInGroupGPU(mainChar, checkedChar, conservativeGroup, 9);
+    return areTheCharsInGroup(mainChar, checkedChar, conservativeGroup, 9);
 }
 
 int areSemiConservative(char mainChar, char checkedChar)
 {
     // char * semiConservativeGroup = (char*)malloc(11*sizeof(char));
     const char semiConservativeGroup[11][GROUP_STRING_SIZE_LIMIT] = {"SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM"};
-    return areTheCharsInGroupGPU(mainChar, checkedChar, semiConservativeGroup, 11);
+    return areTheCharsInGroup(mainChar, checkedChar, semiConservativeGroup, 11);
 }
 
 int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize)
