@@ -8,7 +8,7 @@
 #define MODE_READ "r"
 #define SEQUENCE_1_LIMIT 3000
 #define SEQUENCE_2_LIMIT 2000
-#define GROUP_STRING_SIZE_LIMIT 6
+#define GROUP_STRING_SIZE_LIMIT 7
 #define OUTPUT_FILE "output.txt"
 #define MODE_WRITE "w+"
 #define SLAVE_ID 1
@@ -32,6 +32,9 @@ char checkAndSetProximity(char mainChar, char checkedChar);
 int areConservative(char mainChar, char checkedChar);
 int areSemiConservative(char mainChar, char checkedChar);
 int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize);
+int areTheCharsInGroupGPU(char mainChar, char checkedChar,
+                          const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
+                          int arraySize);
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4);
 
 void handleMultipleRoundsOfSequences(CheckedSequence mySequences[], int numOfSequencesToSend, int *sequencesToIgnore);
@@ -42,9 +45,6 @@ void slaveJob(int rank);
 void mpiSendReceiveInitialVariables(int *mainSequenceLength, int *numOfSequancesToSendReceive, char *mainSequence, float *w1, float *w2, float *w3, float *w4, int rank);
 void checkTheSequences(CheckedSequence mySequences[], int numOfSequences, int *sequencesToIgnore, char *mainSequence, float w1, float w2, float w3, float w4);
 void receiveTheSequencesFromTheSlave(int numOfSequences, CheckedSequence sequencesToReceive[]);
-
-int generateSignsOnGPU(char *mainSequence, char *checkedSequence, int offset,
-                       int hyphenIndex, char *currentSigns);
 
 int main(int argc, char *argv[])
 {
@@ -333,8 +333,7 @@ float getAlignmentForClosestHypenAndCurrentOffset(char *mainSequence, char *chec
     // w-ord, wo-rd, wor-d, word-
     for (int hyphenIndex = 1; hyphenIndex < strlen(checkedSequence) + 1; hyphenIndex++)
     {
-        // generateSignsForCurrentOffsetAndCurrentHyphenIndex(mainSequence, checkedSequence, offset, hyphenIndex, currentSigns);
-        generateSignsOnGPU(mainSequence, checkedSequence, offset, hyphenIndex, currentSigns);
+        generateSignsForCurrentOffsetAndCurrentHyphenIndex(mainSequence, checkedSequence, offset, hyphenIndex, currentSigns);
         tempSum = getAlignmentSum(currentSigns, w1, w2, w3, w4) - w4; // because of the hyphen
         if (tempSum > closestHyphenIndexSum)
         {
@@ -374,13 +373,14 @@ char checkAndSetProximity(char mainChar, char checkedChar)
 int areConservative(char mainChar, char checkedChar)
 {
     const char conservativeGroup[9][GROUP_STRING_SIZE_LIMIT] = {"NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF"};
-    return areTheCharsInGroup(mainChar, checkedChar, conservativeGroup, 9);
+    return areTheCharsInGroupGPU(mainChar, checkedChar, conservativeGroup, 9);
 }
 
 int areSemiConservative(char mainChar, char checkedChar)
 {
+    // char * semiConservativeGroup = (char*)malloc(11*sizeof(char));
     const char semiConservativeGroup[11][GROUP_STRING_SIZE_LIMIT] = {"SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM"};
-    return areTheCharsInGroup(mainChar, checkedChar, semiConservativeGroup, 11);
+    return areTheCharsInGroupGPU(mainChar, checkedChar, semiConservativeGroup, 11);
 }
 
 int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize)
