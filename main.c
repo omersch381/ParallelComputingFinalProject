@@ -40,6 +40,11 @@ void sendTheSlaveItsPartOfTheSequences(char *mainSequence, CheckedSequence mySeq
 int getLongestSequenceIndex(int array[], int numOfElements);
 void slaveJob(int rank);
 void mpiSendReceiveInitialVariables(int *mainSequenceLength, int *numOfSequancesToSendReceive, char *mainSequence, float *w1, float *w2, float *w3, float *w4, int rank);
+void checkTheSequences(CheckedSequence mySequences[], int numOfSequences, int *sequencesToIgnore, char *mainSequence, float w1, float w2, float w3, float w4);
+void receiveTheSequencesFromTheSlave(int numOfSequences, CheckedSequence sequencesToReceive[]);
+
+int generateSignsOnGPU(char *mainSequence, char *checkedSequence, int offset,
+                       int hyphenIndex, char *currentSigns);
 
 int main(int argc, char *argv[])
 {
@@ -68,7 +73,11 @@ int main(int argc, char *argv[])
         // sequencesToIgnore are the ones that the MASTER sends to the SLAVE
         int *sequencesToIgnore = (int *)malloc(numOfSequences / THRESHOLD * sizeof(int));
         sendTheSlaveItsPartOfTheSequences(mainSequence, mySequences, numOfSequences, sequencesToIgnore, rank, w1, w2, w3, w4);
-        // checkTheSequences(mySequences, numOfSequences, sequencesToIgnore);
+        checkTheSequences(mySequences, numOfSequences, sequencesToIgnore, mainSequence, w1, w2, w3, w4);
+        CheckedSequence sequencesToReceive[numOfSequences / THRESHOLD];
+        receiveTheSequencesFromTheSlave(numOfSequences, sequencesToReceive);
+
+        // writeTheSequances();
     }
     else
     {
@@ -93,15 +102,66 @@ int main(int argc, char *argv[])
     }
 
     // free(checkedSequence);
-    
 
     MPI_Finalize();
     return 0;
 }
 
-// void checkTheSequences()
+// void writeTheSequances()
 // {
 // }
+void receiveTheSequencesFromTheSlave(int numOfSequences, CheckedSequence sequencesToReceive[])
+{
+    MPI_Status status;
+    int numOfSequencesToReceive = numOfSequences / THRESHOLD;
+    for (int i = 0; i < numOfSequencesToReceive; i++)
+    {
+        int lengthOfEachSequence;
+        MPI_Recv(&lengthOfEachSequence, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD, &status);
+        // //TODO: check it out
+        // char *initializer = sequencesToReceive[i].sequence;
+        // for (size_t i = 0; i < lengthOfEachSequence; i++)
+        // {
+        //     sequencesToReceive[i].sequence[i] = ' ';
+        // }
+
+        MPI_Recv(sequencesToReceive[i].sequence, lengthOfEachSequence, MPI_CHAR, SLAVE_ID, TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&sequencesToReceive[i].n, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&sequencesToReceive[i].k, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD, &status);
+        printf("\nI received the lengthOfEachSequence %d\n", lengthOfEachSequence);
+        int actualLength = strlen(sequencesToReceive[0].sequence);
+        printf("actual length is %d\n", actualLength);
+        printf("\nI received the sequence %s\n", sequencesToReceive[0].sequence);
+        printf("I received the offset %d\n", sequencesToReceive[0].n);
+        printf("I received the hyphen %d\n", sequencesToReceive[0].k);
+    }
+}
+
+void checkTheSequences(CheckedSequence mySequences[], int numOfSequences, int *sequencesToIgnore, char *mainSequence, float w1, float w2, float w3, float w4)
+{
+    int counterToRevert = 0;
+    int *k = (int *)malloc(sizeof(int));
+    int *n = (int *)malloc(sizeof(int));
+    for (int i = 0; i < numOfSequences; i++)
+    {
+        if (i != *sequencesToIgnore)
+        {
+            // printf("\nI am sending %s sequence to check\n", mySequences[i].sequence);
+            checkSequence(mainSequence, mySequences[i].sequence, w1, w2, w3, w4, n, k);
+            mySequences[i].n = *n;
+            mySequences[i].k = *k;
+        }
+        else
+        {
+            sequencesToIgnore++;
+            counterToRevert++;
+        }
+    }
+    for (int i = 0; i < counterToRevert; i++)
+        sequencesToIgnore--; // Reverting the ignore pointer because I will use it afterwards.
+    free(n);
+    free(k);
+}
 
 void sendTheSlaveItsPartOfTheSequences(char *mainSequence, CheckedSequence mySequences[], int numOfSequences, int *sequencesToIgnore, int rank, float w1, float w2, float w3, float w4)
 {
@@ -116,6 +176,7 @@ void sendTheSlaveItsPartOfTheSequences(char *mainSequence, CheckedSequence mySeq
 }
 
 void handleOneRoundOfSequences(CheckedSequence mySequences[], int numOfSequences, int numOfSequencesToSend, int *sequencesToIgnore)
+// This method happens when the numOfSequences is equals or less than the THRESHOLD
 {
     int array[numOfSequences];
     for (int i = 0; i < numOfSequences; i++)
@@ -127,23 +188,22 @@ void handleOneRoundOfSequences(CheckedSequence mySequences[], int numOfSequences
 }
 
 void handleMultipleRoundsOfSequences(CheckedSequence mySequences[], int numOfSequencesToSend, int *sequencesToIgnore)
+// This method happens when the numOfSequences is more than the THRESHOLD
 {
-    char arrayOfSequencesToSend[numOfSequencesToSend][SEQUENCE_2_LIMIT];
     int index = 0;
-
     for (int j = 0; j < numOfSequencesToSend; j++)
     {
         int array[THRESHOLD];
         for (int i = 0; i < THRESHOLD; i++)
             array[i] = strlen(mySequences[index++].sequence);
         int longestSequenceIndex = sequencesToIgnore[j] = getLongestSequenceIndex(array, THRESHOLD) + j * THRESHOLD;
-        memcpy(arrayOfSequencesToSend[j], mySequences[longestSequenceIndex].sequence, strlen(mySequences[longestSequenceIndex].sequence) + 1);
+        memcpy(mySequences[j].sequence, mySequences[longestSequenceIndex].sequence, strlen(mySequences[longestSequenceIndex].sequence) + 1);
     }
     for (int i = 0; i < numOfSequencesToSend; i++)
     {
-        int lengthOfEachSequence = strlen(arrayOfSequencesToSend[i]);
+        int lengthOfEachSequence = strlen(mySequences[i].sequence);
         MPI_Send(&lengthOfEachSequence, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD);
-        MPI_Send(arrayOfSequencesToSend[i], lengthOfEachSequence, MPI_CHAR, SLAVE_ID, TAG, MPI_COMM_WORLD);
+        MPI_Send(mySequences[i].sequence, lengthOfEachSequence, MPI_CHAR, SLAVE_ID, TAG, MPI_COMM_WORLD);
     }
 }
 
@@ -168,20 +228,26 @@ void slaveJob(int rank)
     float w1, w2, w3, w4;
     mpiSendReceiveInitialVariables(&mainSequenceLength, &numOfSequancesToAllocate, mainSequence, &w1, &w2, &w3, &w4, rank);
 
-    // char sequencesToCheck[numOfSequancesToAllocate][SEQUENCE_2_LIMIT];
-    CheckedSequence sequencesToCheck[numOfSequancesToAllocate];
+    CheckedSequence sequencesToReceive[numOfSequancesToAllocate];
     for (int i = 0; i < numOfSequancesToAllocate; i++)
     {
         int lengthOfEachSequence;
         MPI_Recv(&lengthOfEachSequence, 1, MPI_INT, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
-        MPI_Recv(sequencesToCheck[i].sequence, lengthOfEachSequence, MPI_CHAR, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(sequencesToReceive[i].sequence, lengthOfEachSequence, MPI_CHAR, MASTER_ID, TAG, MPI_COMM_WORLD, &status);
     }
-    // for (int i = 0; i < numOfSequancesToAllocate; i++)
-    // {
-    //     checkSequence(mainSequence, sequencesToCheck[i].sequence, w1, w2, w3, w4, &sequencesToCheck->n, &sequencesToCheck->k);
-    // }
-
-    printf("\n\nAs The Slave, I received %s \n\n", sequencesToCheck[0].sequence);
+    for (int i = 0; i < numOfSequancesToAllocate; i++)
+        checkSequence(mainSequence, sequencesToReceive[i].sequence, w1, w2, w3, w4, &sequencesToReceive->n, &sequencesToReceive->k);
+    for (int i = 0; i < numOfSequancesToAllocate; i++)
+    {
+        int lengthOfEachSequence = strlen(sequencesToReceive[i].sequence);
+        printf("From the slave - Length after returning from method is: %d\n", lengthOfEachSequence);
+        MPI_Send(&lengthOfEachSequence, 1, MPI_INT, MASTER_ID, TAG, MPI_COMM_WORLD);
+        printf("From the slave - RealLength after returning from method is: %ld\n", strlen(sequencesToReceive[i].sequence));
+        MPI_Send(sequencesToReceive[i].sequence, lengthOfEachSequence, MPI_CHAR, MASTER_ID, TAG, MPI_COMM_WORLD);
+        printf("From the slave - the sequence is: %s\n", sequencesToReceive[i].sequence);
+        MPI_Send(&sequencesToReceive[i].n, 1, MPI_INT, MASTER_ID, TAG, MPI_COMM_WORLD);
+        MPI_Send(&sequencesToReceive[i].k, 1, MPI_INT, MASTER_ID, TAG, MPI_COMM_WORLD);
+    }
 }
 
 void mpiSendReceiveInitialVariables(int *mainSequenceLength, int *numOfSequancesToSendReceive, char *mainSequence, float *w1, float *w2, float *w3, float *w4, int rank)
@@ -228,7 +294,7 @@ void checkSequence(char *mainSequence, char *checkedSequence /*, FILE *writer*/,
     // int *k = (int *)malloc(sizeof(int));
     // int *n = (int *)malloc(sizeof(int));
     getclosestOffsetAndHyphen(mainSequence, checkedSequence, n, k, w1, w2, w3, w4);
-    printf("The %s\nSequence is done and it closest offset is %d and its closest hyphen is %d\n", checkedSequence, *n, *k);
+    // printf("The %s\nSequence is done and it closest offset is %d and its closest hyphen is %d\n", checkedSequence, *n, *k);
     // fprintf(writer, "%s", checkedSequence);
     // fprintf(writer, " %d ", *n);
     // fprintf(writer, " %d\n\n", *k);
@@ -237,14 +303,14 @@ void checkSequence(char *mainSequence, char *checkedSequence /*, FILE *writer*/,
 void getclosestOffsetAndHyphen(char *mainSequence, char *checkedSequence, int *n, int *k, float w1, float w2, float w3, float w4)
 // This function is the MAJOR one to take care the *n and the *k
 {
-    printf("strlen(mainSequence) is %ld\n", strlen(mainSequence));
-    printf("strlen(checkedSequence) is %ld\n", strlen(checkedSequence));
+    // printf("strlen(mainSequence) is %ld\n", strlen(mainSequence));
+    // printf("strlen(checkedSequence) is %ld\n", strlen(checkedSequence));
     int offsetsRangeSize = strlen(mainSequence) - strlen(checkedSequence);
-    printf("offsetsRangeSize is %d\n", offsetsRangeSize);
+    // printf("offsetsRangeSize is %d\n", offsetsRangeSize);
     float tempNAlignment;
     float closestOffset = -1;
-    // Trying all possible offsets
-    // #pragma omp parallel for
+// Trying all possible offsets
+#pragma omp parallel for
     for (int offset = 0; offset < offsetsRangeSize - 1; offset++) // The -1 because I added the '-'
     {
         tempNAlignment = getAlignmentForClosestHypenAndCurrentOffset(mainSequence, checkedSequence, offset, k, w1, w2, w3, w4);
@@ -253,9 +319,9 @@ void getclosestOffsetAndHyphen(char *mainSequence, char *checkedSequence, int *n
             closestOffset = tempNAlignment;
             *n = offset;
         }
-        printf("%c", mainSequence[offset]);
+        // printf("%c", mainSequence[offset]);
     }
-    printf("\nThat's it for the current String\n");
+    // printf("\nThat's it for the current String\n");
 }
 
 float getAlignmentForClosestHypenAndCurrentOffset(char *mainSequence, char *checkedSequence, int offset, int *k, float w1, float w2, float w3, float w4)
@@ -267,7 +333,8 @@ float getAlignmentForClosestHypenAndCurrentOffset(char *mainSequence, char *chec
     // w-ord, wo-rd, wor-d, word-
     for (int hyphenIndex = 1; hyphenIndex < strlen(checkedSequence) + 1; hyphenIndex++)
     {
-        generateSignsForCurrentOffsetAndCurrentHyphenIndex(mainSequence, checkedSequence, offset, hyphenIndex, currentSigns);
+        // generateSignsForCurrentOffsetAndCurrentHyphenIndex(mainSequence, checkedSequence, offset, hyphenIndex, currentSigns);
+        generateSignsOnGPU(mainSequence, checkedSequence, offset, hyphenIndex, currentSigns);
         tempSum = getAlignmentSum(currentSigns, w1, w2, w3, w4) - w4; // because of the hyphen
         if (tempSum > closestHyphenIndexSum)
         {
@@ -275,7 +342,6 @@ float getAlignmentForClosestHypenAndCurrentOffset(char *mainSequence, char *chec
             *k = hyphenIndex;
         }
     }
-    // printf("For the first string, the hyphen index %d is the best\n", *k);
     free(currentSigns);
     return closestHyphenIndexSum;
 }
