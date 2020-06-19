@@ -1,0 +1,82 @@
+The problem was parallelized using MPI and OMP and CUDA.
+For every THRESHOLD that is defined in the beginning, the Master process sends (using MPI) the longest 
+sequence to the Slave process.
+Both of the processes work in parallel, they both check all the sequences that they are responsible to 
+check, and they both use OpenMP to check the sequences in a multithreaded way.
+
+The OpenMP is being used (pragma declared) in the offset's for loop (the checkSequence method).
+That means that for each offset, the processes check all possible hyphen indices.
+I chose to write the program in this architecture because I could see that there are multiple nested 
+for loops, that do not depened on each other, i.e. might (or should) be parallelized.
+
+The complexity is o(n^4), for every sequence and if we shall say that the Conservative and 
+Semi-Conservative groups' check consumes o(n). 
+Complexity explanation:
+checkSequence uses a for loop to check every offset (for every sequence called).
+    getAlignmentForClosestHypenAndCurrentOffset uses a for loop to check every hyphen index (for every offset).
+        generateSignsForCurrentOffsetAndCurrentHyphenIndex uses a for loop to generate the signs
+        for every character on the sequence.
+            checkAndSetProximity uses a for loop - it checks (at once) if the MainSequence's character
+            and the CheckedSequence's character are equal or in one of the 2 given groups.
+
+CUDA is being used.....
+
+Explanation about the methods:
+
+I defined a CheckedSequence struct which includes the sequence, the offset, and the hyphen-index.
+
+In my main method I first do a sanity check that makes sure that my program runs with 2 processes.
+
+The masterJob method reads the data from the ipnut.txt file, allocates space by demand, sends the 
+slave process it's parts of the program via MPI, checks its own parts, receives the checked parts 
+from the slave and then writes the results to the output.txt file.
+
+In the sendTheSlaveItsPartOfTheSequences method it is separeted to 2 options:
+    If the numOfSequences is bigger than the THRESHOLD defined in the beginning, it sends the longest
+    one among them to the slave process, and repeats this action for every THRESHOLD sequences.
+    E.g. if the THRESHOLD is 4 and we have 9 sequences, there will be 2 sequences that will be sent to
+    the slave process - the longest among the 4 ones, and the longest among the 4-7 ones.
+
+    Else, (less than THRESHOLD sequences), it just sends the slave one longest sequence, even if there 
+    are only one sequence.
+
+In both handleMultipleRoundsOfSequences and handleOneRoundOfSequences it keep the int* sequencesToIgnore,
+a pointer that the Master process will use later to make sure it doesn't check the same sequences 
+that were sent to the Slave process before.
+
+The checkTheSequences method is the major one related to actually checking the sequences.
+It uses the checkSequence for every sequence.
+
+In the receiveTheSequencesFromTheSlave method, the Master simply receives the checked sequences by he 
+Slave process.
+
+The writeTheSequances uses writeSequenceToFile to write every sequnce to the file, pretty obvious.
+
+In the slaveJob method, we can see all the flow of the Slave process.
+It starts with receving the sequencesToReceive (and to check) from the Master process.
+For every sequence of the numOfSequancesToCheck, the Slave receives, first the length of the sequence,
+and then the sequence itself, the Slave process checks the sequences and sends the Master the results.
+
+mpiSendReceiveInitialVariables method describes the initial send/receive actions the Master has to send
+to the Slave, e.g. w1, w2, w3, w4, the sequences etc.
+
+The checkSequence method is the first one that I used the openmp decleration.
+Each process that runs that method, has to run it multithreaded.
+For each offset it gets the closest hyphen-index, and it chooses the closest offset in this way.
+
+The getAlignmentForClosestHypenAndCurrentOffset method gets an offset and finds the closest hyphen-index
+for that offset.
+It does it using the generateSignsForCurrentOffsetAndCurrentHyphenIndex method, and getAlignmentSum.
+
+The generateSignsForCurrentOffsetAndCurrentHyphenIndex method receives and allocation of space for the 
+future char *currentSigns, where for each character of the checkedSequence, it uses checkAndSetProximity.
+
+checkAndSetProximity method receives 2 characters and returns its proximity, as stated in the assignment.
+
+The methods areConservative and areSemiConservative check if the 2 characters are present in the same
+group, for each group of letters.
+The order is first, areConservative, and then (if it is not conservative) areSemiConservative.
+Both of them use the areTheCharsInGroup method, which does exactly as its name reffer.
+
+getAlignmentSum receives a signs chain and returns its sum, by the keys that were written in the assignment.
+
