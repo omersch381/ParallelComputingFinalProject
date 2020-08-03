@@ -313,9 +313,10 @@ void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2
     int offsetsRangeSize = strlen(mainSequence) - strlen(checkedSequence);
     float tempNAlignment;
     float closestOffsetSum = -1;
+    int maximumHyphenIndexHolder = -1;
 
 // Trying all possible offsets
-// #pragma omp parallel for
+#pragma omp parallel for
     for (int offset = 0; offset < offsetsRangeSize - 1; offset++) // The -1 because I added the '-'
     {
         tempNAlignment = getAlignmentForClosestHypenAndCurrentOffset(mainSequence, checkedSequence, offset, k, w1, w2, w3, w4);
@@ -323,8 +324,10 @@ void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2
         {
             closestOffsetSum = tempNAlignment;
             *n = offset;
+            maximumHyphenIndexHolder = *k;
         }
     }
+    *k = maximumHyphenIndexHolder;
     printf("The biggest sum is: %f, the biggest offset is %d and hyphen %d\n", closestOffsetSum, *n, *k);
 }
 
@@ -339,15 +342,15 @@ float getAlignmentForClosestHypenAndCurrentOffset(char *mainSequence, char *chec
     // w-ord, wo-rd, wor-d, word-
     for (int hyphenIndex = 1; hyphenIndex < strlen(checkedSequence) + 1; hyphenIndex++)
     {
-        printf("hyphenIndex checked is: %d\n", hyphenIndex);
+        // printf("hyphenIndex checked is: %d\n", hyphenIndex);
         generateSignsForCurrentOffsetAndCurrentHyphenIndex(mainSequence, checkedSequence, offset, hyphenIndex, currentSigns);
         tempSum = getAlignmentSum(currentSigns, w1, w2, w3, w4) - w4; // because of the hyphen
-        printf("alignment sum is: %d\n", tempSum);
+        // printf("alignment sum is: %d\n", tempSum);
         if (tempSum > closestHyphenIndexSum)
         {
             closestHyphenIndexSum = tempSum;
             *k = hyphenIndex;
-            printf("NEW HIGHEST ALIGNMENT SUM!! %d\n", tempSum);
+            // printf("NEW HIGHEST ALIGNMENT SUM!! %d\n", tempSum);
         }
     }
     free(currentSigns);
