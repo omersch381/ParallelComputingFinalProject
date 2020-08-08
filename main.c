@@ -7,7 +7,7 @@
 #define INPUT_FILE "input.txt"
 #define MODE_READ "r"
 #define SEQUENCE_1_LIMIT 3000
-#define SEQUENCE_2_LIMIT 2000
+#define SEQUENCE_2_LIMIT 2000 // TODO
 #define GROUP_STRING_SIZE_LIMIT 7
 #define OUTPUT_FILE "output.txt"
 #define MODE_WRITE "w+"
@@ -25,7 +25,7 @@
 
 typedef struct CheckedSequences
 {
-    char sequence[SEQUENCE_2_LIMIT];
+    char *sequence;
     int n;
     int k;
 } CheckedSequence;
@@ -56,7 +56,7 @@ int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[
 //                           int arraySize);
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4, int offset, int size);
 void checkIfNotNull(void *allocation);
-
+void moveTheHyphenInOneIndexInSignsChain(char* currentSigns, int hyphenIndex, int offset, char *checkedSequence, char *mainSequence);
 void addHyphenAt(char *checkedSequence, int index);
 
 int main(int argc, char *argv[])
@@ -108,7 +108,10 @@ void masterJob(int rank)
     CheckedSequence sequencesToReceive[numOfSequences / THRESHOLD];
 
     for (int i = 0; i < numOfSequences; i++)
+    {
+        mySequences[i].sequence = (char *)malloc(sizeof(char) * SEQUENCE_2_LIMIT);
         fscanf(reader, "%s", mySequences[i].sequence);
+    }
 
     // sequencesToIgnore are the ones that the MASTER sends to the SLAVE
     checkIfNotNull(sequencesToIgnore = (int *)malloc(numOfSequences / THRESHOLD * sizeof(int)));
@@ -123,6 +126,10 @@ void masterJob(int rank)
     // writeTheSequances(mySequences, sequencesToIgnore, numOfSequences, writer);
     // printf("5\n");
 
+    for (int i = 0; i < numOfSequences; i++)
+    {
+        free(mySequences[i].sequence);
+    }
     free(mainSequence);
     free(sequencesToIgnore);
     fclose(writer);
@@ -203,8 +210,11 @@ void checkTheSequences(CheckedSequence mySequences[], int numOfSequences, int *s
     {
         if (i != *sequencesToIgnore)
         {
-            if (i == 1)
+            if (i == 3)
+            {
+                // printf("Check: %s\n", mySequences[i].sequence);
                 checkSequence(mainSequence, mySequences[i].sequence, w1, w2, w3, w4, &mySequences[i].n, &mySequences[i].k);
+            }
         }
         else
         {
@@ -319,85 +329,132 @@ void mpiSendReceiveInitialVariables(int *mainSequenceLength, int *numOfSequances
 
 void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2, float w3, float w4, int *n, int *k)
 {
-    char *test = (char *)malloc(sizeof(char) * 6);
-    char *test2 = (char *)malloc(sizeof(char) * 3);
-    test[0] = 'P';
-    test[1] = 'S';
-    test[2] = 'H';
-    test[3] = 'L';
-    test[4] = 'Q';
-    test[5] = 'Y';
-    test2[0] = 'S';
-    test2[1] = 'H';
-    test2[2] = 'Q';
+    // char *test = (char *)malloc(sizeof(char) * 6);
+    // char *test2 = (char *)malloc(sizeof(char) * 3);
+    // test[0] = 'P';
+    // test[1] = 'S';
+    // test[2] = 'H';
+    // test[3] = 'L';
+    // test[4] = 'Q';
+    // test[5] = 'Y';
+    // test2[0] = 'S';
+    // test2[1] = 'H';
+    // test2[2] = 'Q';
 
-    int offsetsRangeSize = strlen(test) - strlen(test2);
+    int offsetsRangeSize = strlen(mainSequence) - strlen(checkedSequence);
     float tempNAlignment;
     float closestOffsetSum = -1;
-    // int maximumHyphenIndexHolder = -1;
+    int hyphenHolder = -1;
 
     // Trying all possible offsets
     // #pragma omp parallel for
     for (int offset = 0; offset < offsetsRangeSize; offset++)
     {
-        // printf("From checkSequence, offset is %d\n", offset);
-        tempNAlignment = getAlignmentForClosestHypenAndCurrentOffset(test, test2, offset, k, w1, w2, w3, w4);
+        printf("From checkSequence, offset is %d\n", offset);
+        tempNAlignment = getAlignmentForClosestHypenAndCurrentOffset(mainSequence, checkedSequence, offset, k, w1, w2, w3, w4);
         if (tempNAlignment > closestOffsetSum)
         {
             closestOffsetSum = tempNAlignment;
             *n = offset;
-            // maximumHyphenIndexHolder = *k;
+            hyphenHolder = *k;
         }
     }
-    // *k = maximumHyphenIndexHolder;
-    printf("The biggest sum is: %f, the biggest offset is %d and hyphen %d\n", closestOffsetSum, *n, *k);
+    printf("The biggest sum is: %f, the biggest offset is %d and hyphen %d\n", closestOffsetSum, *n, hyphenHolder);
 }
 
 float getAlignmentForClosestHypenAndCurrentOffset(char *mainSequence, char *checkedSequence, int offset, int *k, float w1, float w2, float w3, float w4)
 {
-    printf("The Length of checkSequence is: %ld\n", strlen(checkedSequence));
+    // printf("The Length of checkSequence is: %ld\n", strlen(checkedSequence));
     char *currentSigns;
     float closestHyphenIndexSum = -1;
     float tempSum = -1;
 
-    int hyphenHolder = -1;
-    float sumHolder = -1;
-
-    checkIfNotNull(currentSigns = (char *)malloc(strlen(checkedSequence + 1) * sizeof(char)));
+    // checkIfNotNull(currentSigns = (char *)malloc(strlen(checkedSequence + 1) * sizeof(char)));
     // For each offset, trying all possible hyphens (n options), since index = 1
     // w-ord, wo-rd, wor-d, word-
 
-    printf("A Simple check: global hyphen index start loop is at %d, end loop < %ld\n", offset + 1, offset + strlen(checkedSequence) + 1);
-    printf("The Length of checkSequence is: %ld\n", strlen(checkedSequence));
-    for (int hyphenIndex = 1; hyphenIndex < strlen(checkedSequence) + 1; hyphenIndex++)
+    // char *backup = (char *)malloc(strlen(checkedSequence) * sizeof(char));
+    // strcpy(backup, checkedSequence);
+    // printf("check11\n");
+    // printf("size is %ld\n", strlen(checkedSequence + 1));
+
+    // checkIfNotNull(currentSigns = (char *)malloc(strlen(checkedSequence) + 1 * sizeof(char)));
+    currentSigns = (char *)malloc(strlen(checkedSequence) + 2);
+    currentSigns[strlen(checkedSequence) + 1] = 0;
+    // printf("The length of checkedSequence is: %ld\n", strlen(checkedSequence));
+    // printf("The length of signs is: %ld\n", strlen(currentSigns));
+    // printf("check12\n");
+    char* backup = strdup(checkedSequence);
+    for (int hyphenIndex = 1; hyphenIndex < strlen(checkedSequence); hyphenIndex++)
     {
-        printf("HyphenIndex is %d\n", hyphenIndex);
-        char *backup = strdup(checkedSequence);
-        addHyphenAt(checkedSequence, hyphenIndex); // = 2
-        generateSignsForCurrentOffsetAndCurrentHyphenIndex(mainSequence, checkedSequence, offset, hyphenIndex, currentSigns);
+        if (hyphenIndex == 1)
+        {
+            // printf("check1\n");
+
+            addHyphenAt(checkedSequence, hyphenIndex);
+            // printf("check2\n");
+            generateSignsForCurrentOffsetAndCurrentHyphenIndex(mainSequence, checkedSequence, offset, hyphenIndex, currentSigns);
+            // printf("check3\n");
+        }
+        else {
+            moveTheHyphenInOneIndexInSignsChain(currentSigns, hyphenIndex, offset, checkedSequence, mainSequence);
+        }
+
+
+
+
+        // // printf("HyphenIndex is %d\n", hyphenIndex);
+        // checkIfNotNull(currentSigns = (char *)malloc(strlen(checkedSequence + 1) * sizeof(char)));
+        // char *backup = (char *)malloc(strlen(checkedSequence) * sizeof(char));
+        // strcpy(backup, checkedSequence);
+        // printf("strlen of backup is %ld\n", strlen(backup));
+        // printf("strlen of checkedSequence is %ld\n", strlen(checkedSequence));
+
+        // addHyphenAt(backup, hyphenIndex);
+        // generateSignsForCurrentOffsetAndCurrentHyphenIndex(mainSequence, backup, offset, hyphenIndex, currentSigns);
         tempSum = getAlignmentSum(currentSigns, w1, w2, w3, w4, offset, strlen(checkedSequence));
+        // printf("I called getAlignment for the %d time\n", hyphenIndex);
         // printf("offset is %d, hyphenIndex checked is: %d, alignment sum is: %d\n", offset, hyphenIndex, tempSum);
         if (tempSum > closestHyphenIndexSum)
         {
             closestHyphenIndexSum = tempSum;
-            sumHolder = tempSum;
             *k = hyphenIndex;
-            hyphenHolder = hyphenIndex;
             printf("NEW HIGHEST K!! %d, with the sum of %f and offset %d\n", hyphenIndex, tempSum, offset);
         }
-        free(checkedSequence);
-        checkedSequence = strdup(backup);
-        free(backup);
+        // printf("1\n");
+        // free(backup);
+        // printf("2\n");
+        // checkedSequence = strdup(backup);
+        // printf("3\n");
+
+        // printf("4\n");
+        // printf("hyphenIndex is %d on iteration num #%d\n", hyphenIndex, offset);
+        // free(currentSigns);
     }
+    // printf("checked signs is %s\n", currentSigns);
     free(currentSigns);
+    // printf("5\n");
+    // free(backup);
+    // printf("6\n");
     // printf("biggest k is: %d, biggest offset is %d\n", *k, offset);
-    printf("for offset %d, biggest k is %d with the sum of %f\n", offset, hyphenHolder, sumHolder);
+    // printf("for offset %d, biggest k is %d with the sum of %f\n", offset, *k, closestHyphenIndexSum);
+
+    strcpy(checkedSequence, backup);
     return closestHyphenIndexSum;
+}
+
+void moveTheHyphenInOneIndexInSignsChain(char* currentSigns, int hyphenIndex, int offset, char *checkedSequence, char *mainSequence) {
+    char selectedChar = checkedSequence[hyphenIndex];
+    currentSigns[hyphenIndex - 1] = checkAndSetProximity(mainSequence[offset + hyphenIndex - 1], selectedChar);
+    currentSigns[hyphenIndex] = checkAndSetProximity(mainSequence[offset + hyphenIndex], '-');
 }
 
 void addHyphenAt(char *checkedSequence, int index)
 {
+    // printf("1\n");
+    // printf("%s\n", checkedSequence);
     checkedSequence = (char *)realloc(checkedSequence, strlen(checkedSequence) + 2);
+    // printf("2\n");
     checkedSequence[strlen(checkedSequence) + 1] = 0;
     for (int i = strlen(checkedSequence); i > index; i--)
         checkedSequence[i] = checkedSequence[i - 1];
@@ -407,20 +464,20 @@ void addHyphenAt(char *checkedSequence, int index)
 void generateSignsForCurrentOffsetAndCurrentHyphenIndex(char *mainSequence, char *checkedSequence, int offset, int hyphenIndex, char *currentSigns)
 {
     int j = 0;
-    printf("we start printin\n");
-    printf("We Compare %s to %s at offset %d and with hyphen %d\n", mainSequence, checkedSequence, offset, hyphenIndex);
+    // printf("we start printin\n");
+    // printf("We Compare %s to %s at offset %d and with hyphen %d\n", mainSequence, checkedSequence, offset, hyphenIndex);
+    currentSigns[strlen(currentSigns) - 1] = 0;
     for (int mainSequenceIndex = offset; mainSequenceIndex < offset + strlen(checkedSequence); mainSequenceIndex++)
     {
-        // if (j != hyphenIndex)
-        currentSigns[mainSequenceIndex] = checkAndSetProximity(mainSequence[mainSequenceIndex], checkedSequence[j]);
-
-        // else
-        // currentSigns[j] = checkAndSetProximity(mainSequence[mainSequenceIndex], '-');
+        // printf("we compare the char %c to the char %c\n", mainSequence[mainSequenceIndex], checkedSequence[j]);
+        // printf("The result is %c\n", checkAndSetProximity(mainSequence[mainSequenceIndex], checkedSequence[j]));
+        currentSigns[j] = checkAndSetProximity(mainSequence[mainSequenceIndex], checkedSequence[j]);
         j++;
-        printf("%c", currentSigns[mainSequenceIndex]);
+        // printf("%s\n", currentSigns);
+        // printf("%c", currentSigns[mainSequenceIndex]);
     }
-    printf("\n");
-    printf("The signs chain is: %s, with the kength of %ld\n", currentSigns, strlen(currentSigns));
+    // printf("\n");
+    // printf("The signs chain is: %s, with the kength of %ld\n", currentSigns, strlen(currentSigns));
 }
 
 char checkAndSetProximity(char mainChar, char checkedChar)
@@ -438,13 +495,13 @@ char checkAndSetProximity(char mainChar, char checkedChar)
 
 int areConservative(char mainChar, char checkedChar)
 {
-    const char conservativeGroup[NUMBER_OF_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF"};
+    const char conservativeGroup[NUMBER_OF_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] ={ "NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF" };
     return areTheCharsInGroup(mainChar, checkedChar, conservativeGroup, 9);
 }
 
 int areSemiConservative(char mainChar, char checkedChar)
 {
-    const char semiConservativeGroup[NUMBER_OF_SEMI_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM"};
+    const char semiConservativeGroup[NUMBER_OF_SEMI_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] ={ "SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM" };
     return areTheCharsInGroup(mainChar, checkedChar, semiConservativeGroup, 11);
 }
 
@@ -476,31 +533,31 @@ int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4, int offset, int size)
 {
     float sum = 0;
-    for (int i = offset; i < offset + size; i++)
+    for (int i = 0; i < offset + size; i++)
     {
         switch (signs[i])
         {
         case MATCH:
             sum += w1;
-            printf("current sum is %f\n", sum);
+            // printf("current sum for the %d'th char is %f\n", i, sum);
             break;
         case CONSERVATIVE:
             sum -= w2;
-            printf("current sum is %f\n", sum);
+            // printf("current sum for the %d'th char is %f\n", i, sum);
             break;
         case SEMI_CONSERVATIVE:
             sum -= w3;
-            printf("current sum is %f\n", sum);
+            // printf("current sum for the %d'th char is %f\n", i, sum);
             break;
         case NO_MATCH:
             sum -= w4;
-            printf("current sum is %f\n", sum);
+            // printf("current sum for the %d'th char is %f\n", i, sum);
             break;
         default:
             break;
         }
     }
-    printf("The sum of the current iteration is %f\n", sum);
+    // printf("The sum of the current signs %s is %f\n", signs, sum);
     return sum;
 }
 
