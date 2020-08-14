@@ -4,6 +4,8 @@
 #include <string.h>
 #define GROUP_STRING_SIZE_LIMIT 7
 
+// Declarations
+
 int areTheCharsInGroupGPU(char mainChar, char checkedChar,
                           const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
                           int arraySize);
@@ -12,6 +14,8 @@ __global__ void
 areTheCharsInGroup(char mainChar, char checkedChar,
                    const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
                    int arraySize, int *areThey);
+
+// Implementations
 
 __global__ void
 areTheCharsInGroup(char mainChar, char checkedChar,
@@ -32,8 +36,11 @@ areTheCharsInGroup(char mainChar, char checkedChar,
   }
   if (isMainCharInTheGroup && isCheckedCharInTheGroup)
     *areThey = 1;
-  else
+  else {
     *areThey = 0;
+    isMainCharInTheGroup = 0;
+    isCheckedCharInTheGroup = 0;
+  }
 }
 
 int areTheCharsInGroupGPU(char mainChar, char checkedChar,
@@ -63,7 +70,9 @@ int areTheCharsInGroupGPU(char mainChar, char checkedChar,
     exit(EXIT_FAILURE);
   }
 
+  // Are they in the same group
   int *areThey = (int *)malloc(sizeof(int));
+  *areThey = 0;
 
   // Launch the Kernel
   int threadsPerBlock = 64;
@@ -78,14 +87,14 @@ int areTheCharsInGroupGPU(char mainChar, char checkedChar,
     exit(EXIT_FAILURE);
   }
 
-  // Copy the  result from GPU to the host memory.
-  err = cudaMemcpy(groupToCheck, groupToCheckDevicePointer, groupToCheckSize,
-                   cudaMemcpyDeviceToHost);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to copy result array from device to host -%s\n",
-            cudaGetErrorString(err));
-    exit(EXIT_FAILURE);
-  }
+  // // Copy the  result from GPU to the host memory.
+  // err = cudaMemcpy(groupToCheck, groupToCheckDevicePointer, groupToCheckSize,
+  //                  cudaMemcpyDeviceToHost);
+  // if (err != cudaSuccess) {
+  //   fprintf(stderr, "Failed to copy result array from device to host -%s\n",
+  //           cudaGetErrorString(err));
+  //   exit(EXIT_FAILURE);
+  // }
 
   // Free allocated memory on GPU - mainSequenceDevicePointer
   if (cudaFree(groupToCheckDevicePointer) != cudaSuccess) {
