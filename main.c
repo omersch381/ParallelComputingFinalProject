@@ -3,8 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-// #include "cudaChecker.cu"
+#include "cudaChecker.h"
 
+#define GROUP_STRING_SIZE_LIMIT 7
 #define INPUT_FILE "input.txt"
 #define MODE_READ "r"
 #define SEQUENCE_1_LIMIT 3000
@@ -53,13 +54,13 @@ void generateSignsForCurrentOffsetAndCurrentHyphenIndex(char *mainSequence, char
 char checkAndSetProximity(char mainChar, char checkedChar);
 int areConservative(char mainChar, char checkedChar);
 int areSemiConservative(char mainChar, char checkedChar);
-int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize);
-int areTheCharsInGroupGPU(char mainChar, char checkedChar,
-    const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
-    int arraySize);
+// int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize);
+// int areTheCharsInGroupGPU(char mainChar, char checkedChar,
+//                           char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
+//                           int arraySize);
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4, int offset, int size);
 void checkIfNotNull(void *allocation);
-void moveTheHyphenInOneIndexInSignsChain(char* currentSigns, int hyphenIndex, int offset, char *checkedSequence, char *mainSequence);
+void moveTheHyphenInOneIndexInSignsChain(char *currentSigns, int hyphenIndex, int offset, char *checkedSequence, char *mainSequence);
 void addHyphenAt(char *checkedSequence, int index);
 
 int main(int argc, char *argv[])
@@ -210,10 +211,11 @@ int getLongestSequenceIndex(int array[], int numOfElements)
 void checkTheSequences(CheckedSequence mySequences[], int numOfSequences, int *sequencesToIgnore, char *mainSequence, float w1, float w2, float w3, float w4)
 {
     int counterToRevert = 0;
-    #pragma omp parallel for
+#pragma omp parallel for
     for (int i = 0; i < numOfSequences; i++)
     {
-        if (i != *sequencesToIgnore) {
+        if (i != *sequencesToIgnore)
+        {
             checkSequence(mainSequence, mySequences[i].sequence, w1, w2, w3, w4, &mySequences[i].n, &mySequences[i].k);
         }
         else
@@ -234,7 +236,7 @@ void receiveTheSequencesFromTheSlave(int numOfSequences, CheckedSequence sequenc
     {
         int lengthOfEachSequence;
         MPI_Recv(&lengthOfEachSequence, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD, &status);
-        checkIfNotNull(sequencesToReceive[i].sequence = (char*)malloc(sizeof(char)*SEQUENCE_2_LIMIT));
+        checkIfNotNull(sequencesToReceive[i].sequence = (char *)malloc(sizeof(char) * SEQUENCE_2_LIMIT));
         MPI_Recv(sequencesToReceive[i].sequence, lengthOfEachSequence, MPI_CHAR, SLAVE_ID, TAG, MPI_COMM_WORLD, &status);
         MPI_Recv(&sequencesToReceive[i].n, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD, &status);
         MPI_Recv(&sequencesToReceive[i].k, 1, MPI_INT, SLAVE_ID, TAG, MPI_COMM_WORLD, &status);
@@ -276,7 +278,7 @@ void slaveJob(int rank)
 
     CheckedSequence sequencesToReceive[numOfsequencesToCheck];
     for (int i = 0; i < numOfsequencesToCheck; i++)
-        checkIfNotNull(sequencesToReceive[i].sequence = (char*)malloc(sizeof(char)*SEQUENCE_2_LIMIT));
+        checkIfNotNull(sequencesToReceive[i].sequence = (char *)malloc(sizeof(char) * SEQUENCE_2_LIMIT));
 
     for (int i = 0; i < numOfsequencesToCheck; i++)
     {
@@ -349,7 +351,7 @@ void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2
 
     for (int offset = 0; offset < offsetsRangeSize; offset++)
     {
-        char* backup = strdup(checkedSequence); // I would like to mention that I could have just rewinded the hyphen index
+        char *backup = strdup(checkedSequence); // I would like to mention that I could have just rewinded the hyphen index
         // and avoid this allocation.
 
         tempNAlignment = getAlignmentForClosestHypenAndCurrentOffset(mainSequence, checkedSequence, offset, k, w1, w2, w3, w4, currentSigns);
@@ -397,7 +399,8 @@ float getAlignmentForClosestHypenAndCurrentOffset(char *mainSequence, char *chec
     return closestHyphenIndexSum;
 }
 
-void moveTheHyphenInOneIndexInSignsChain(char* currentSigns, int hyphenIndex, int offset, char *checkedSequence, char *mainSequence) {
+void moveTheHyphenInOneIndexInSignsChain(char *currentSigns, int hyphenIndex, int offset, char *checkedSequence, char *mainSequence)
+{
     char selectedChar = checkedSequence[hyphenIndex];
     currentSigns[hyphenIndex - 1] = checkAndSetProximity(mainSequence[offset + hyphenIndex - 1], selectedChar);
     currentSigns[hyphenIndex] = checkAndSetProximity(mainSequence[offset + hyphenIndex], HYPHEN);
@@ -438,40 +441,41 @@ char checkAndSetProximity(char mainChar, char checkedChar)
 
 int areConservative(char mainChar, char checkedChar)
 {
-    const char conservativeGroup[NUMBER_OF_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] ={ "NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF" };
+    char conservativeGroup[NUMBER_OF_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF"};
     return areTheCharsInGroupGPU(mainChar, checkedChar, conservativeGroup, 9);
 }
 
 int areSemiConservative(char mainChar, char checkedChar)
 {
-    const char semiConservativeGroup[NUMBER_OF_SEMI_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] ={ "SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM" };
+    char semiConservativeGroup[NUMBER_OF_SEMI_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM"};
     return areTheCharsInGroupGPU(mainChar, checkedChar, semiConservativeGroup, 11);
 }
 
-int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize)
-{
-    int isMainCharInTheGroup = 0;
-    int isCheckedCharInTheGroup = 0;
+// int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize)
+// {
+//     int isMainCharInTheGroup = 0;
+//     int isCheckedCharInTheGroup = 0;
 
-    for (int i = 0; i < arraySize; i++)
-    {
-        for (int j = 0; j < strlen(groupToCheck[i]); j++)
-        {
-            if (mainChar == groupToCheck[i][j])
-                isMainCharInTheGroup = 1;
-            if (checkedChar == groupToCheck[i][j])
-                isCheckedCharInTheGroup = 1;
-        }
-        if (isMainCharInTheGroup && isCheckedCharInTheGroup)
-            return 1;
-        else
-        {
-            isMainCharInTheGroup = 0;
-            isCheckedCharInTheGroup = 0;
-        }
-    }
-    return 0;
-}
+//     for (int i = 0; i < arraySize; i++)
+//     {
+//         for (int j = 0; j < strlen(groupToCheck[i]); j++)
+//         {
+//             if (mainChar == groupToCheck[i][j])
+//                 isMainCharInTheGroup = 1;
+//             if (checkedChar == groupToCheck[i][j])
+//                 isCheckedCharInTheGroup = 1;
+//         }
+//         if (isMainCharInTheGroup && isCheckedCharInTheGroup)
+//             return 1;
+//         else
+//         {
+//             isMainCharInTheGroup = 0;
+//             isCheckedCharInTheGroup = 0;
+//         }
+//     }
+//     return 0;
+// }
+
 
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4, int offset, int size)
 {

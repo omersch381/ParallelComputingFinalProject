@@ -2,24 +2,21 @@
 #include <helper_cuda.h>
 #include <stdlib.h>
 #include <string.h>
+#include "cudaChecker.h"
 #define GROUP_STRING_SIZE_LIMIT 7
 
 // Declarations
 
-int areTheCharsInGroupGPU(char mainChar, char checkedChar,
-                          const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
-                          int arraySize);
-
 __global__ void
 areTheCharsInGroup(char mainChar, char checkedChar,
-                   const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
+                   char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
                    int arraySize, int *areThey);
 
 // Implementations
 
 __global__ void
 areTheCharsInGroup(char mainChar, char checkedChar,
-                   const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
+                   char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
                    int arraySize, int *areThey) {
   int isMainCharInTheGroup = 0;
   int isCheckedCharInTheGroup = 0;
@@ -44,7 +41,7 @@ areTheCharsInGroup(char mainChar, char checkedChar,
 }
 
 int areTheCharsInGroupGPU(char mainChar, char checkedChar,
-                          const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
+                          char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
                           int arraySize) {
   // Error code to check return values for CUDA calls
   cudaError_t err = cudaSuccess;
@@ -52,7 +49,7 @@ int areTheCharsInGroupGPU(char mainChar, char checkedChar,
   size_t groupToCheckSize = arraySize * GROUP_STRING_SIZE_LIMIT * sizeof(char);
 
   // Allocate memory on GPU to copy the mainSequence from the host
-  int *groupToCheckDevicePointer;
+  char groupToCheckDevicePointer[][GROUP_STRING_SIZE_LIMIT] = {};
 
   err = cudaMalloc((void **)&groupToCheckDevicePointer, groupToCheckSize);
   if (err != cudaSuccess) {
