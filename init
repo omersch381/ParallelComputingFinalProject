@@ -1,0 +1,31 @@
+SHRC_FILE="$HOME/.bashrc"
+
+echo "alias gs='git status'" >> "$BASHRC_FILE"
+echo '' >> "$BASHRC_FILE"
+echo 'INCLUDES=/home/linuxu/cuda_practice/common/inc' >> "$BASHRC_FILE"
+echo '' >> "$BASHRC_FILE"
+echo '# Insert the command in the next format: cudago <cuda-file.cu>' >> "$BASHRC_FILE"
+echo 'cudago(){' >> "$BASHRC_FILE"
+echo '	nvcc -I "$INCLUDES" -o cuda_output.o -c "$1" # $1 == cuda-file.cu' >> "$BASHRC_FILE"
+echo '	nvcc cuda_output.o -o RUNME' >> "$BASHRC_FILE"
+echo '	./RUNME' >> "$BASHRC_FILE"
+echo '	rm cuda_output.o RUNME' >> "$BASHRC_FILE"
+echo '}' >> "$BASHRC_FILE"
+
+git config --global user.email "omersch381@gmail.com"
+git config --global user.name "omer"
+
+
+# Intsalling vscode:
+curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+sudo install -o root -g root -m 644 packages.microsoft.gpg /usr/share/keyrings/
+sudo sh -c 'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
+sudo apt-get install apt-transport-https
+sudo apt-get update
+sudo apt-get install code
+
+### Or an alternative:
+#sudo apt install snapd -y
+#sudo snap install --classic code
+
+code --install-extension kriegalex.vscode-cudacpp
