@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "cudaChecker.cu"
 
 #define INPUT_FILE "input.txt"
 #define MODE_READ "r"
@@ -53,9 +54,9 @@ char checkAndSetProximity(char mainChar, char checkedChar);
 int areConservative(char mainChar, char checkedChar);
 int areSemiConservative(char mainChar, char checkedChar);
 int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize);
-// int areTheCharsInGroupGPU(char mainChar, char checkedChar,
-//                           const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
-//                           int arraySize);
+int areTheCharsInGroupGPU(char mainChar, char checkedChar,
+    const char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
+    int arraySize);
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4, int offset, int size);
 void checkIfNotNull(void *allocation);
 void moveTheHyphenInOneIndexInSignsChain(char* currentSigns, int hyphenIndex, int offset, char *checkedSequence, char *mainSequence);
@@ -470,6 +471,9 @@ int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[
         }
     }
     return 0;
+}
+int areTheCharsInGroupGPU() {
+    
 }
 
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4, int offset, int size)
