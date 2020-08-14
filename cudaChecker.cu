@@ -2,7 +2,9 @@
 #include <helper_cuda.h>
 #include <stdlib.h>
 #include <string.h>
-#include "cudaChecker.h"
+extern "C" {
+  #include "cudaChecker.h"
+}
 #define GROUP_STRING_SIZE_LIMIT 7
 
 // Declarations
@@ -40,7 +42,7 @@ areTheCharsInGroup(char mainChar, char checkedChar,
   }
 }
 
-int areTheCharsInGroupGPU(char mainChar, char checkedChar,
+extern "C" int areTheCharsInGroupGPU(char mainChar, char checkedChar,
                           char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
                           int arraySize) {
   // Error code to check return values for CUDA calls
