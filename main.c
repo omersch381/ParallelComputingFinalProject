@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "cudaChecker.cu"
+// #include "cudaChecker.cu"
 
 #define INPUT_FILE "input.txt"
 #define MODE_READ "r"
@@ -439,13 +439,13 @@ char checkAndSetProximity(char mainChar, char checkedChar)
 int areConservative(char mainChar, char checkedChar)
 {
     const char conservativeGroup[NUMBER_OF_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] ={ "NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF" };
-    return areTheCharsInGroup(mainChar, checkedChar, conservativeGroup, 9);
+    return areTheCharsInGroupGPU(mainChar, checkedChar, conservativeGroup, 9);
 }
 
 int areSemiConservative(char mainChar, char checkedChar)
 {
     const char semiConservativeGroup[NUMBER_OF_SEMI_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] ={ "SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM" };
-    return areTheCharsInGroup(mainChar, checkedChar, semiConservativeGroup, 11);
+    return areTheCharsInGroupGPU(mainChar, checkedChar, semiConservativeGroup, 11);
 }
 
 int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize)
@@ -471,9 +471,6 @@ int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[
         }
     }
     return 0;
-}
-int areTheCharsInGroupGPU() {
-    
 }
 
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4, int offset, int size)
