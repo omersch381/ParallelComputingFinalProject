@@ -11,24 +11,24 @@ extern "C" {
 
 __global__ void
 areTheCharsInGroup(char mainChar, char checkedChar,
-                   char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
+                   char *groupToCheck,
                    int arraySize, int *areThey);
 
 // Implementations
 
 __global__ void
 areTheCharsInGroup(char mainChar, char checkedChar,
-                   char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
+                   char* groupToCheck,
                    int arraySize, int *areThey) {
   int isMainCharInTheGroup = 0;
   int isCheckedCharInTheGroup = 0;
 
   for (int i = 0; i < arraySize; i++) {
     for (int j = 0; j < GROUP_STRING_SIZE_LIMIT; j++) {
-      if (groupToCheck[i][j]) {
-        if (mainChar == groupToCheck[i][j])
+      if (groupToCheck[i * GROUP_STRING_SIZE_LIMIT + j]) {
+        if (mainChar == groupToCheck[i * GROUP_STRING_SIZE_LIMIT + j])
           isMainCharInTheGroup = 1;
-        if (checkedChar == groupToCheck[i][j])
+        if (checkedChar == groupToCheck[i * GROUP_STRING_SIZE_LIMIT + j])
           isCheckedCharInTheGroup = 1;
       }
     }
@@ -51,7 +51,8 @@ extern "C" int areTheCharsInGroupGPU(char mainChar, char checkedChar,
   size_t groupToCheckSize = arraySize * GROUP_STRING_SIZE_LIMIT * sizeof(char);
 
   // Allocate memory on GPU to copy the mainSequence from the host
-  char groupToCheckDevicePointer[][GROUP_STRING_SIZE_LIMIT] = {};
+  // char groupToCheckDevicePointer[][GROUP_STRING_SIZE_LIMIT] = {};
+  char* groupToCheckDevicePointer = 0;
 
   err = cudaMalloc((void **)&groupToCheckDevicePointer, groupToCheckSize);
   if (err != cudaSuccess) {
@@ -60,9 +61,16 @@ extern "C" int areTheCharsInGroupGPU(char mainChar, char checkedChar,
     exit(EXIT_FAILURE);
   }
 
+  char* tester = (char*) malloc(groupToCheckSize);
+  memcpy(tester,groupToCheck,groupToCheckSize);
   // Copy mainSequence from host to the GPU memory
-  err = cudaMemcpy(groupToCheckDevicePointer, groupToCheck, groupToCheckSize,
-                   cudaMemcpyHostToDevice);
+  err = cudaMemcpy(groupToCheckDevicePointer, tester, groupToCheckSize,
+    cudaMemcpyHostToDevice);
+
+
+  // // Copy mainSequence from host to the GPU memory
+  // err = cudaMemcpy(groupToCheckDevicePointer, groupToCheck, groupToCheckSize,
+  //                  cudaMemcpyHostToDevice);
   if (err != cudaSuccess) {
     fprintf(stderr, "Failed to copy data from host to device - %s\n",
             cudaGetErrorString(err));
@@ -96,11 +104,16 @@ extern "C" int areTheCharsInGroupGPU(char mainChar, char checkedChar,
   // }
 
   // Free allocated memory on GPU - mainSequenceDevicePointer
+
+  // cudaFree(groupToCheckDevicePointer);
+
   if (cudaFree(groupToCheckDevicePointer) != cudaSuccess) {
     fprintf(stderr, "Failed to free device data - %s\n",
             cudaGetErrorString(err));
     exit(EXIT_FAILURE);
   }
+
+  free(tester);
 
   return *areThey;
 }
