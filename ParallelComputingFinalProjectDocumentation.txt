@@ -38,8 +38,15 @@ I could improve my program with the following ways:
     every iteration (though it wouldn't change the complexity)
 
 
+CUDA is being used to parallelize the areTheCharsInGroup method.
+The areTheCharsInGroup method checks if 2 characters are in the same group of characters.
+The method is divided into 2 separete and almost identical parts because I tried to allocated as less 
+memory as possible.
+I allocated memory for an integer in the device, which will have the answer - 0 or 1.
+0 in case that both of the characters are not in the same group and 1 if they are.
+I use 64 threads per block, make sure that there are no errors after every operation and free the 
+variable I allocated for the answer.
 
-CUDA is being used.....
 
 Explanation about the methods:
 

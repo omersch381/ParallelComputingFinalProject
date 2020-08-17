@@ -51,17 +51,6 @@ areTheCharsInGroup(char mainChar, char checkedChar,
         }
       }
   }
-  
-  // for (int i = 0; i < arraySize; i++) {
-  //   for (int j = 0; j < GROUP_STRING_SIZE_LIMIT; j++) {
-  //     if (groupToCheck[i * GROUP_STRING_SIZE_LIMIT + j]) {
-  //       if (mainChar == groupToCheck[i * GROUP_STRING_SIZE_LIMIT + j])
-  //         isMainCharInTheGroup = 1;
-  //       if (checkedChar == groupToCheck[i * GROUP_STRING_SIZE_LIMIT + j])
-  //         isCheckedCharInTheGroup = 1;
-  //     }
-  //   }
-  // }
   if (isMainCharInTheGroup && isCheckedCharInTheGroup)
     *areThey = 1;
   else {

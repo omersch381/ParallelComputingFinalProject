@@ -54,10 +54,7 @@ void generateSignsForCurrentOffsetAndCurrentHyphenIndex(char *mainSequence, char
 char checkAndSetProximity(char mainChar, char checkedChar);
 int areConservative(char mainChar, char checkedChar);
 int areSemiConservative(char mainChar, char checkedChar);
-// int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize);
-// int areTheCharsInGroupGPU(char mainChar, char checkedChar,
-//                           char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
-//                           int arraySize);
+int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize);
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4, int offset, int size);
 void checkIfNotNull(void *allocation);
 void moveTheHyphenInOneIndexInSignsChain(char *currentSigns, int hyphenIndex, int offset, char *checkedSequence, char *mainSequence);
@@ -345,16 +342,13 @@ void mpiSendReceiveInitialVariables(int *mainSequenceLength, int *numOfsequences
 
 void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2, float w3, float w4, int *n, int *k)
 {
-    printf("entered checkSequence\n");
     int offsetsRangeSize = strlen(mainSequence) - strlen(checkedSequence);
     float tempNAlignment;
     float closestOffsetSum = -1;
     int hyphenHolder = -1;
     char *currentSigns;
 
-    // printf("before check if not null\n");
     checkIfNotNull(currentSigns = (char *)malloc(strlen(checkedSequence) + 1));
-    // printf("after check if not null\n");
     currentSigns[strlen(checkedSequence)] = 0;
 
     for (int offset = 0; offset < offsetsRangeSize; offset++)
@@ -455,41 +449,39 @@ char checkAndSetProximity(char mainChar, char checkedChar)
 int areConservative(char mainChar, char checkedChar)
 {
     char conservativeGroup[NUMBER_OF_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF"};
-    // printf("sanity check1\n");
     return areTheCharsInGroupGPU(mainChar, checkedChar, conservativeGroup, NUMBER_OF_CONSERVATIVE_STRINGS);
 }
 
 int areSemiConservative(char mainChar, char checkedChar)
 {
     char semiConservativeGroup[NUMBER_OF_SEMI_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM"};
-    // printf("sanity check2\n");
     return areTheCharsInGroupGPU(mainChar, checkedChar, semiConservativeGroup, NUMBER_OF_SEMI_CONSERVATIVE_STRINGS);
 }
 
-// int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize)
-// {
-//     int isMainCharInTheGroup = 0;
-//     int isCheckedCharInTheGroup = 0;
+int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize)
+{
+    int isMainCharInTheGroup = 0;
+    int isCheckedCharInTheGroup = 0;
 
-//     for (int i = 0; i < arraySize; i++)
-//     {
-//         for (int j = 0; j < strlen(groupToCheck[i]); j++)
-//         {
-//             if (mainChar == groupToCheck[i][j])
-//                 isMainCharInTheGroup = 1;
-//             if (checkedChar == groupToCheck[i][j])
-//                 isCheckedCharInTheGroup = 1;
-//         }
-//         if (isMainCharInTheGroup && isCheckedCharInTheGroup)
-//             return 1;
-//         else
-//         {
-//             isMainCharInTheGroup = 0;
-//             isCheckedCharInTheGroup = 0;
-//         }
-//     }
-//     return 0;
-// }
+    for (int i = 0; i < arraySize; i++)
+    {
+        for (int j = 0; j < strlen(groupToCheck[i]); j++)
+        {
+            if (mainChar == groupToCheck[i][j])
+                isMainCharInTheGroup = 1;
+            if (checkedChar == groupToCheck[i][j])
+                isCheckedCharInTheGroup = 1;
+        }
+        if (isMainCharInTheGroup && isCheckedCharInTheGroup)
+            return 1;
+        else
+        {
+            isMainCharInTheGroup = 0;
+            isCheckedCharInTheGroup = 0;
+        }
+    }
+    return 0;
+}
 
 
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4, int offset, int size)
