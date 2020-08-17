@@ -340,17 +340,21 @@ void mpiSendReceiveInitialVariables(int *mainSequenceLength, int *numOfsequences
 
 void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2, float w3, float w4, int *n, int *k)
 {
+    printf("entered checkSequence\n");
     int offsetsRangeSize = strlen(mainSequence) - strlen(checkedSequence);
     float tempNAlignment;
     float closestOffsetSum = -1;
     int hyphenHolder = -1;
     char *currentSigns;
 
+    // printf("before check if not null\n");
     checkIfNotNull(currentSigns = (char *)malloc(strlen(checkedSequence) + 1));
+    // printf("after check if not null\n");
     currentSigns[strlen(checkedSequence)] = 0;
 
     for (int offset = 0; offset < offsetsRangeSize; offset++)
     {
+        printf("The offset is %d\n",offset);
         char *backup = strdup(checkedSequence); // I would like to mention that I could have just rewinded the hyphen index
         // and avoid this allocation.
 
@@ -442,13 +446,15 @@ char checkAndSetProximity(char mainChar, char checkedChar)
 int areConservative(char mainChar, char checkedChar)
 {
     char conservativeGroup[NUMBER_OF_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF"};
-    return areTheCharsInGroupGPU(mainChar, checkedChar, conservativeGroup, 9);
+    // printf("sanity check1\n");
+    return areTheCharsInGroupGPU(mainChar, checkedChar, conservativeGroup, NUMBER_OF_CONSERVATIVE_STRINGS);
 }
 
 int areSemiConservative(char mainChar, char checkedChar)
 {
     char semiConservativeGroup[NUMBER_OF_SEMI_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM"};
-    return areTheCharsInGroupGPU(mainChar, checkedChar, semiConservativeGroup, 11);
+    // printf("sanity check2\n");
+    return areTheCharsInGroupGPU(mainChar, checkedChar, semiConservativeGroup, NUMBER_OF_SEMI_CONSERVATIVE_STRINGS);
 }
 
 // int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize)

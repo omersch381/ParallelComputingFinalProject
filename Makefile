@@ -13,4 +13,4 @@ cudaChecker.o: cudaChecker.cu cudaChecker.h
 	nvcc  -I /usr/local/cuda-9.1/samples/common/inc  -c cudaChecker.cu -o cudaChecker.o 
 
 clean:
-	rm -f parallel_project.o cudaChecker.o
+	rm -f parallel_project.o cudaChecker.o program
