@@ -213,6 +213,7 @@ void checkTheSequences(CheckedSequence mySequences[], int numOfSequences, int *s
     int counterToRevert = 0;
     omp_init_lock(&lock1);
     omp_init_lock(&lock2);
+
 #pragma omp parallel for
     for (int i = 0; i < numOfSequences; i++)
     {
@@ -353,7 +354,6 @@ void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2
 
     for (int offset = 0; offset < offsetsRangeSize; offset++)
     {
-        printf("The offset is %d\n",offset);
         char *backup = strdup(checkedSequence); // I would like to mention that I could have just rewinded the hyphen index
         // and avoid this allocation.
 
@@ -373,7 +373,7 @@ void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2
     *k = hyphenHolder;
 
     if (PRINT_TO_TERMINAL)
-        printf("The biggest sum is: %f, the biggest offset is %d and hyphen %d\n", closestOffsetSum, *n, *k);
+        printf("The biggest offset is %d and the biggest hyphen is %d\n", *n, *k);
 }
 
 float getAlignmentForClosestHypenAndCurrentOffset(char *mainSequence, char *checkedSequence, int offset, int *k, float w1, float w2, float w3, float w4, char *currentSigns)
@@ -449,13 +449,13 @@ char checkAndSetProximity(char mainChar, char checkedChar)
 int areConservative(char mainChar, char checkedChar)
 {
     char conservativeGroup[NUMBER_OF_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF"};
-    return areTheCharsInGroupGPU(mainChar, checkedChar, conservativeGroup, NUMBER_OF_CONSERVATIVE_STRINGS);
+    return areTheCharsInGroup(mainChar, checkedChar, conservativeGroup, NUMBER_OF_CONSERVATIVE_STRINGS);
 }
 
 int areSemiConservative(char mainChar, char checkedChar)
 {
     char semiConservativeGroup[NUMBER_OF_SEMI_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM"};
-    return areTheCharsInGroupGPU(mainChar, checkedChar, semiConservativeGroup, NUMBER_OF_SEMI_CONSERVATIVE_STRINGS);
+    return areTheCharsInGroup(mainChar, checkedChar, semiConservativeGroup, NUMBER_OF_SEMI_CONSERVATIVE_STRINGS);
 }
 
 int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[][GROUP_STRING_SIZE_LIMIT], int arraySize)
