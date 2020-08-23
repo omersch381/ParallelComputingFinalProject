@@ -25,7 +25,7 @@
 #define SEMI_CONSERVATIVE '.'
 #define NO_MATCH ' '
 #define HYPHEN '-'
-#define PRINT_TO_TERMINAL 1
+#define PRINT_TO_TERMINAL 0
 
 typedef struct CheckedSequences
 {
@@ -340,7 +340,8 @@ void mpiSendReceiveInitialVariables(int *mainSequenceLength, int *numOfsequences
 
 void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2, float w3, float w4, int *n, int *k)
 {
-    printf("entered checkSequence\n");
+    if (PRINT_TO_TERMINAL)
+        printf("entered checkSequence\n");
     int offsetsRangeSize = strlen(mainSequence) - strlen(checkedSequence);
     float tempNAlignment;
     float closestOffsetSum = -1;
@@ -354,7 +355,8 @@ void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2
 
     for (int offset = 0; offset < offsetsRangeSize; offset++)
     {
-        printf("The offset is %d\n",offset);
+        if (PRINT_TO_TERMINAL)
+            printf("The offset is %d\n",offset);
         char *backup = strdup(checkedSequence); // I would like to mention that I could have just rewinded the hyphen index
         // and avoid this allocation.
 
