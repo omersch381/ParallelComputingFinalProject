@@ -353,7 +353,6 @@ void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2
 
     for (int offset = 0; offset < offsetsRangeSize; offset++)
     {
-        printf("The offset is %d\n",offset);
         char *backup = strdup(checkedSequence); // I would like to mention that I could have just rewinded the hyphen index
         // and avoid this allocation.
 
@@ -373,7 +372,7 @@ void checkSequence(char *mainSequence, char *checkedSequence, float w1, float w2
     *k = hyphenHolder;
 
     if (PRINT_TO_TERMINAL)
-        printf("The biggest sum is: %f, the biggest offset is %d and hyphen %d\n", closestOffsetSum, *n, *k);
+        printf("The biggest offset is %d and the biggest hyphen is %d\n", *n, *k);
 }
 
 float getAlignmentForClosestHypenAndCurrentOffset(char *mainSequence, char *checkedSequence, int offset, int *k, float w1, float w2, float w3, float w4, char *currentSigns)
@@ -482,7 +481,6 @@ int areTheCharsInGroup(char mainChar, char checkedChar, const char groupToCheck[
     }
     return 0;
 }
-
 
 float getAlignmentSum(char *signs, float w1, float w2, float w3, float w4, int offset, int size)
 {

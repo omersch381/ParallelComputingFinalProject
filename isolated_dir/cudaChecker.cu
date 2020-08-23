@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 extern "C" {
-  #include "cudaChecker.h"
+#include "cudaChecker.h"
 }
 
 #define NUMBER_OF_CONSERVATIVE_STRINGS 9
@@ -12,22 +12,27 @@ extern "C" {
 
 // Declarations
 
-__global__ void
-areTheCharsInGroup(char mainChar, char checkedChar,
-                   int arraySize, int *areThey);
+__global__ void areTheCharsInGroup(char mainChar, char checkedChar,
+                                   int arraySize, int *areThey);
 
 // Implementations
 
-__global__ void
-areTheCharsInGroup(char mainChar, char checkedChar,
-                   int arraySize, int *areThey) {
-  char conservativeGroup[NUMBER_OF_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"NDEQ", "NEQK", "STA", "MILV", "QHRK", "NHQK", "FYW", "HY", "MILF"};
-  char semiConservativeGroup[NUMBER_OF_SEMI_CONSERVATIVE_STRINGS][GROUP_STRING_SIZE_LIMIT] = {"SAG", "ATV", "CSA", "SGND", "STPA", "STNK", "NEQHRK", "NDEQHK", "SNDEQK", "HFY", "FVLIM"};
+__global__ void areTheCharsInGroup(char mainChar, char checkedChar,
+                                   int arraySize, int *areThey) {
+  char conservativeGroup[NUMBER_OF_CONSERVATIVE_STRINGS]
+                        [GROUP_STRING_SIZE_LIMIT] = {"NDEQ", "NEQK", "STA",
+                                                     "MILV", "QHRK", "NHQK",
+                                                     "FYW",  "HY",   "MILF"};
+  char semiConservativeGroup[NUMBER_OF_SEMI_CONSERVATIVE_STRINGS]
+                            [GROUP_STRING_SIZE_LIMIT] = {
+                                "SAG",    "ATV",  "CSA",    "SGND",
+                                "STPA",   "STNK", "NEQHRK", "NDEQHK",
+                                "SNDEQK", "HFY",  "FVLIM"};
 
   int isMainCharInTheGroup = 0;
   int isCheckedCharInTheGroup = 0;
 
-  if (arraySize == NUMBER_OF_CONSERVATIVE_STRINGS){
+  if (arraySize == NUMBER_OF_CONSERVATIVE_STRINGS) {
     for (int i = 0; i < arraySize; i++) {
       for (int j = 0; j < GROUP_STRING_SIZE_LIMIT; j++) {
         if (conservativeGroup[i][j]) {
@@ -38,18 +43,17 @@ areTheCharsInGroup(char mainChar, char checkedChar,
         }
       }
     }
-  }
-  else {
-      for (int i = 0; i < arraySize; i++) {
-        for (int j = 0; j < GROUP_STRING_SIZE_LIMIT; j++) {
-          if (semiConservativeGroup[i][j]) {
-            if (mainChar == semiConservativeGroup[i][j])
-              isMainCharInTheGroup = 1;
-            if (checkedChar == semiConservativeGroup[i][j])
-              isCheckedCharInTheGroup = 1;
-          }
+  } else {
+    for (int i = 0; i < arraySize; i++) {
+      for (int j = 0; j < GROUP_STRING_SIZE_LIMIT; j++) {
+        if (semiConservativeGroup[i][j]) {
+          if (mainChar == semiConservativeGroup[i][j])
+            isMainCharInTheGroup = 1;
+          if (checkedChar == semiConservativeGroup[i][j])
+            isCheckedCharInTheGroup = 1;
         }
       }
+    }
   }
   if (isMainCharInTheGroup && isCheckedCharInTheGroup)
     *areThey = 1;
@@ -60,17 +64,17 @@ areTheCharsInGroup(char mainChar, char checkedChar,
   }
 }
 
-extern "C" int areTheCharsInGroupGPU(char mainChar, char checkedChar,
-                          char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
-                          int arraySize) {
+extern "C" int
+areTheCharsInGroupGPU(char mainChar, char checkedChar,
+                      char groupToCheck[][GROUP_STRING_SIZE_LIMIT],
+                      int arraySize) {
   // Error code to check return values for CUDA calls
   cudaError_t err = cudaSuccess;
 
   size_t groupToCheckSize = arraySize * GROUP_STRING_SIZE_LIMIT * sizeof(char);
 
   // Allocate memory on GPU to copy the mainSequence from the host
-  // char groupToCheckDevicePointer[][GROUP_STRING_SIZE_LIMIT] = {};
-  int* areThey;
+  int *areThey;
 
   err = cudaMalloc((void **)&areThey, sizeof(int));
   if (err != cudaSuccess) {
@@ -79,32 +83,12 @@ extern "C" int areTheCharsInGroupGPU(char mainChar, char checkedChar,
     exit(EXIT_FAILURE);
   }
 
-  // char* tester = (char*) malloc(groupToCheckSize);
-  // memcpy(tester,groupToCheck,groupToCheckSize);
-  // // Copy mainSequence from host to the GPU memory
-  // err = cudaMemcpy(groupToCheckDevicePointer, tester, groupToCheckSize,
-  //   cudaMemcpyHostToDevice);
-
-
-  // // Copy mainSequence from host to the GPU memory
-  // err = cudaMemcpy(groupToCheckDevicePointer, groupToCheck, groupToCheckSize,
-  //                  cudaMemcpyHostToDevice);
-  // if (err != cudaSuccess) {
-  //   fprintf(stderr, "Failed to copy data from host to device - %s\n",
-  //           cudaGetErrorString(err));
-  //   exit(EXIT_FAILURE);
-  // }
-
-  // Are they in the same group
-  // int *areThey = (int *)malloc(sizeof(int));
-  // *areThey = 0;
-
   // Launch the Kernel
   int threadsPerBlock = 64;
   int blocksPerGrid =
       (groupToCheckSize + threadsPerBlock - 1) / threadsPerBlock;
-  areTheCharsInGroup<<<blocksPerGrid, threadsPerBlock>>>(
-      mainChar, checkedChar, arraySize, areThey);
+  areTheCharsInGroup<<<blocksPerGrid, threadsPerBlock>>>(mainChar, checkedChar,
+                                                         arraySize, areThey);
   err = cudaGetLastError();
   if (err != cudaSuccess) {
     fprintf(stderr, "Failed to launch areTheCharsInGroupGPU kernel -  %s\n",
@@ -124,15 +108,11 @@ extern "C" int areTheCharsInGroupGPU(char mainChar, char checkedChar,
 
   // Free allocated memory on GPU - mainSequenceDevicePointer
 
-  // cudaFree(groupToCheckDevicePointer);
-
   if (cudaFree(areThey) != cudaSuccess) {
     fprintf(stderr, "Failed to free device data - %s\n",
             cudaGetErrorString(err));
     exit(EXIT_FAILURE);
   }
 
-  // free(tester);
-  
   return result;
 }
